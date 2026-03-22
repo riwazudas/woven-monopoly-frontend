@@ -1,19 +1,22 @@
 <script setup>
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameSessionStore } from '../stores/gameSession'
 
 const router = useRouter()
 const sessionStore = useGameSessionStore()
 
+const isSubmitting = computed(() => sessionStore.isInitializing)
+const errorMessage = computed(() => sessionStore.errorMessage)
+
 const form = reactive({
-  playerOne: 'Ari',
-  playerTwo: 'Sam',
-  playerThree: 'Rin',
-  playerFour: 'Tao',
-  goMoney: 200,
+  playerOne: 'Peter',
+  playerTwo: 'Billy',
+  playerThree: 'Charlotte',
+  playerFour: 'Sweedal',
+  goMoney: 1,
   rentMultiplier: 1,
-  diceSequence: '1,2,3,4,5,6',
+  diceSequence: '1,3,1,1,1,2',
 })
 
 const parseDice = (value) => {
@@ -23,7 +26,7 @@ const parseDice = (value) => {
     .filter((value) => Number.isInteger(value) && value > 0)
 }
 
-const beginGame = () => {
+const beginGame = async () => {
   const config = {
     playerNames: [form.playerOne, form.playerTwo, form.playerThree, form.playerFour],
     goMoney: Number(form.goMoney),
@@ -31,19 +34,7 @@ const beginGame = () => {
     diceSequence: parseDice(form.diceSequence),
   }
 
-  // Phase 2 route scaffolding: real API integration is handled in later phases.
-  sessionStore.startSession({
-    gameId: `local-${Date.now()}`,
-    config,
-    gameState: {
-      turn: 0,
-      players: config.playerNames.map((name) => ({
-        name,
-        balance: config.goMoney,
-        position: 0,
-      })),
-    },
-  })
+  await sessionStore.createGameSession(config)
 
   router.push({ name: 'board' })
 }
@@ -54,6 +45,7 @@ const beginGame = () => {
     <div class="panel">
       <h1>Game Setup</h1>
       <p class="lead">Configure players and simulation settings before initializing the game.</p>
+      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
       <form class="setup-form" @submit.prevent="beginGame">
         <label>
@@ -93,7 +85,9 @@ const beginGame = () => {
 
         <div class="actions span-2">
           <RouterLink class="btn ghost" :to="{ name: 'landing' }">Back</RouterLink>
-          <button class="btn primary" type="submit">Initialize Game</button>
+          <button class="btn primary" type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Starting...' : 'Initialize Game' }}
+          </button>
         </div>
       </form>
     </div>
