@@ -18,7 +18,8 @@
       <ul>
         <li>Game setup posts once to <code>/api/games</code>.</li>
         <li>Each turn posts to <code>/api/games/:id/moves/roll</code>.</li>
-        <li>Every response fully overwrites local UI state.</li>
+        <li>Every response fully overwrites the Pinia game snapshot.</li>
+        <li>Board, markers, dice, and notifications all read one shared store.</li>
         <li>No polling, no GET requests, no partial sync.</li>
       </ul>
     </div>

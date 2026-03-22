@@ -6,8 +6,8 @@ import { useGameSessionStore } from '../stores/gameSession'
 const router = useRouter()
 const sessionStore = useGameSessionStore()
 
-const winner = computed(() => sessionStore.winner || sessionStore.gameState?.winner || 'TBD')
-const players = computed(() => sessionStore.gameState?.players || [])
+const winner = computed(() => sessionStore.winner || 'TBD')
+const players = computed(() => sessionStore.players)
 
 const playAgain = () => {
   sessionStore.resetSession()
