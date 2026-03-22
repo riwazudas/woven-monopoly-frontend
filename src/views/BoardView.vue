@@ -1,6 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import BoardGrid from '../components/BoardGrid.vue'
+import DiceRoller from '../components/DiceRoller.vue'
+import EventNotifications from '../components/EventNotifications.vue'
 import { useGameSessionStore } from '../stores/gameSession'
 
 const router = useRouter()
@@ -8,11 +11,21 @@ const sessionStore = useGameSessionStore()
 
 const gameId = computed(() => sessionStore.gameId)
 const config = computed(() => sessionStore.config)
-const players = computed(() => sessionStore.gameState?.players || [])
+const players = computed(() => sessionStore.players)
+const winner = computed(() => sessionStore.winner)
 
 const finishDemoGame = () => {
-  sessionStore.winner = players.value[0]?.name || 'TBD'
-  sessionStore.persist()
+  if (!sessionStore.snapshot) {
+    return
+  }
+
+  const decidedWinner = players.value[0]?.name || 'TBD'
+  sessionStore.overwriteSnapshot({
+    ...sessionStore.snapshot,
+    status: 'finished',
+    winner: decidedWinner,
+  })
+  sessionStore.addNotification(`Game finished. Winner: ${decidedWinner}`, 'success')
   router.push({ name: 'results' })
 }
 </script>
@@ -24,18 +37,20 @@ const finishDemoGame = () => {
       <p class="lead">
         Session <code>{{ gameId }}</code>
       </p>
+      <p v-if="winner" class="eyebrow">Winner locked: {{ winner }}</p>
 
-      <div class="board-grid" role="presentation">
-        <div v-for="n in 16" :key="n" class="board-tile">Tile {{ n - 1 }}</div>
-      </div>
+      <BoardGrid />
 
       <div class="status-layout">
+        <DiceRoller />
+        <EventNotifications />
+
         <article class="status-card">
           <h2>Players</h2>
           <ul>
             <li v-for="player in players" :key="player.name">
               <strong>{{ player.name }}</strong>
-              <span>${{ player.balance }}</span>
+              <span>${{ player.balance ?? player.money }}</span>
               <small>Position {{ player.position }}</small>
             </li>
           </ul>
