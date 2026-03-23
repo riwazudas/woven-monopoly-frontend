@@ -586,6 +586,7 @@ code {
   justify-content: space-between;
   align-items: center;
   gap: 0.55rem;
+  font-size: 0.9rem;
 }
 
 .notice-success {

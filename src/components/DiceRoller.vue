@@ -6,9 +6,12 @@ const sessionStore = useGameSessionStore()
 
 const canRoll = computed(() => sessionStore.canRoll && !sessionStore.isGameOver)
 const isRolling = computed(() => sessionStore.isRolling)
-const currentTurn = computed(() => sessionStore.currentTurn)
-const turnNumber = computed(() => sessionStore.turnNumber)
+const players = computed(() => sessionStore.players)
 const currentPlayerName = computed(() => sessionStore.currentPlayerName)
+const currentPlayerNumber = computed(() => {
+  const idx = players.value.findIndex((player) => player.name === currentPlayerName.value)
+  return idx >= 0 ? idx + 1 : 'N/A'
+})
 const lastMove = computed(() => sessionStore.lastMove)
 const movementEvent = computed(() => sessionStore.movementEvent)
 const boardSize = computed(() => sessionStore.boardTiles.length)
@@ -107,9 +110,8 @@ const roll = async () => {
     <div class="dice-face" :class="{ 'dice-face-rolling': isRolling }" aria-hidden="true">
       {{ visualFace }}
     </div>
-    <p><strong>Turn:</strong> {{ turnNumber }}</p>
+    <p><strong>Player Number:</strong> {{ currentPlayerNumber }}</p>
     <p><strong>Active Player:</strong> {{ currentPlayerName }}</p>
-    <p class="lead">Current turn index: {{ currentTurn }}</p>
     <button class="btn primary" type="button" :disabled="!canRoll" @click="roll">
       {{ isRolling ? 'Rolling...' : 'Roll Dice' }}
     </button>
