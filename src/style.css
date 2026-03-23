@@ -240,9 +240,26 @@ code {
 }
 
 .board-shell {
-  margin-top: 1rem;
+  margin-top: 0;
   display: grid;
   gap: 0.75rem;
+}
+
+.board-workspace {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: minmax(290px, 350px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.board-sidebar {
+  position: sticky;
+  top: 1rem;
+}
+
+.board-canvas {
+  min-width: 0;
 }
 
 .board-grid-square {
@@ -471,9 +488,9 @@ code {
 
 .status-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 .status-card {
@@ -584,5 +601,13 @@ code {
 
   .board-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .board-sidebar {
+    position: static;
   }
 }

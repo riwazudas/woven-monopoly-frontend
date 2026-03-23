@@ -50,29 +50,35 @@ const finishDemoGame = () => {
       </p>
       <p v-if="winner" class="eyebrow">Winner locked: {{ winner }}</p>
 
-      <BoardGrid />
+      <div class="board-workspace">
+        <aside class="board-sidebar">
+          <div class="status-layout">
+            <DiceRoller />
+            <EventNotifications />
 
-      <div class="status-layout">
-        <DiceRoller />
-        <EventNotifications />
+            <article class="status-card">
+              <h2>Players</h2>
+              <ul>
+                <li v-for="player in players" :key="player.name">
+                  <strong>{{ player.name }}</strong>
+                  <span>${{ player.balance ?? player.money }}</span>
+                  <small>Position {{ player.position }}</small>
+                </li>
+              </ul>
+            </article>
 
-        <article class="status-card">
-          <h2>Players</h2>
-          <ul>
-            <li v-for="player in players" :key="player.name">
-              <strong>{{ player.name }}</strong>
-              <span>${{ player.balance ?? player.money }}</span>
-              <small>Position {{ player.position }}</small>
-            </li>
-          </ul>
-        </article>
+            <article class="status-card">
+              <h2>Current Config</h2>
+              <p>GO Money: ${{ config.goMoney }}</p>
+              <p>Rent Multiplier: x{{ config.rentMultiplier }}</p>
+              <p>Dice Sequence: {{ config.diceSequence.join(', ') }}</p>
+            </article>
+          </div>
+        </aside>
 
-        <article class="status-card">
-          <h2>Current Config</h2>
-          <p>GO Money: ${{ config.goMoney }}</p>
-          <p>Rent Multiplier: x{{ config.rentMultiplier }}</p>
-          <p>Dice Sequence: {{ config.diceSequence.join(', ') }}</p>
-        </article>
+        <div class="board-canvas">
+          <BoardGrid />
+        </div>
       </div>
 
       <div class="actions">
