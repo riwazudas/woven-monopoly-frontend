@@ -1,13 +1,16 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useGameSessionStore } from '../stores/gameSession'
-import PlayerMarkers from './PlayerMarkers.vue'
 
 const sessionStore = useGameSessionStore()
 
 const tiles = computed(() => sessionStore.boardTiles)
 const players = computed(() => sessionStore.players)
 const activeTileId = ref(null)
+const gridRef = ref(null)
+const isLayerReady = ref(false)
+const tileNodeByPosition = ref({})
+const tokenCoordinates = ref({})
 
 const ownerPalette = ['#0f766e', '#b45309', '#0369a1', '#a21caf']
 
@@ -133,6 +136,109 @@ const setActiveTile = (tileId) => {
   activeTileId.value = tileId
 }
 
+const setTileNode = (position, node) => {
+  if (!position && position !== 0) {
+    return
+  }
+
+  const key = String(position)
+  if (node) {
+    tileNodeByPosition.value[key] = node
+  } else {
+    delete tileNodeByPosition.value[key]
+  }
+}
+
+const playerTokenColor = (name = '') => {
+  const palette = ['#0f766e', '#b45309', '#0369a1', '#a21caf']
+  const hash = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  return palette[hash % palette.length]
+}
+
+const syncTokenCoordinates = async (instant = false) => {
+  await nextTick()
+
+  if (!gridRef.value) {
+    return
+  }
+
+  const gridRect = gridRef.value.getBoundingClientRect()
+  const nextCoordinates = { ...tokenCoordinates.value }
+
+  players.value.forEach((player) => {
+    const node = tileNodeByPosition.value[String(player.position)]
+    if (!node) {
+      return
+    }
+
+    const rect = node.getBoundingClientRect()
+    const x = rect.left - gridRect.left + rect.width / 2
+    const y = rect.top - gridRect.top + rect.height / 2
+
+    nextCoordinates[player.id] = {
+      x,
+      y,
+      instant,
+    }
+  })
+
+  tokenCoordinates.value = nextCoordinates
+  if (!isLayerReady.value) {
+    isLayerReady.value = true
+  }
+}
+
+const animatedTokens = computed(() => {
+  const movingId = sessionStore.movementEvent?.playerId
+
+  return players.value
+    .map((player) => {
+      const coord = tokenCoordinates.value[player.id]
+      if (!coord) {
+        return null
+      }
+
+      return {
+        id: player.id,
+        name: player.name,
+        x: coord.x,
+        y: coord.y,
+        color: playerTokenColor(player.name),
+        isMoving: movingId != null && String(movingId) === String(player.id),
+        instant: coord.instant,
+      }
+    })
+    .filter(Boolean)
+})
+
+const handleResize = () => {
+  syncTokenCoordinates(true)
+}
+
+onMounted(async () => {
+  await syncTokenCoordinates(true)
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+watch(
+  () => players.value.map((player) => `${player.id}:${player.position}`).join('|'),
+  async (_newValue, oldValue) => {
+    await syncTokenCoordinates(oldValue == null)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => tilePlacements.value.length,
+  async () => {
+    await syncTokenCoordinates(true)
+  },
+)
+
 const boardGridStyle = computed(() => {
   const size = boardDimension.value
   return {
@@ -152,10 +258,11 @@ const boardCenterStyle = computed(() => {
 
 <template>
   <section class="board-shell">
-    <div class="board-grid board-grid-square" role="presentation" :style="boardGridStyle">
+    <div ref="gridRef" class="board-grid board-grid-square" role="presentation" :style="boardGridStyle">
       <article
         v-for="tile in tilePlacements"
         :key="tile.id"
+        :ref="(node) => setTileNode(tile.position, node)"
         class="board-tile"
         :class="{ 'board-tile-owned': Boolean(tile.owner), 'board-tile-active': activeTile?.id === tile.id }"
         :style="{
@@ -182,12 +289,28 @@ const boardCenterStyle = computed(() => {
 
         <p>Price: {{ tile.price != null ? `$${tile.price}` : 'N/A' }}</p>
         <p>Owner: {{ tile.owner?.name || 'Bank' }}</p>
-        <PlayerMarkers :players="players" :tile-index="tile.position" />
       </article>
 
       <div class="board-center" :style="boardCenterStyle">
         <h3>Woven Monopoly</h3>
         <p>Clockwise snapshot-driven board</p>
+      </div>
+
+      <div class="player-layer" :class="{ 'player-layer-ready': isLayerReady }" aria-hidden="true">
+        <div
+          v-for="token in animatedTokens"
+          :key="token.id"
+          class="player-token"
+          :class="{ 'player-token-moving': token.isMoving, 'player-token-instant': token.instant }"
+          :style="{
+            '--token-x': `${token.x}px`,
+            '--token-y': `${token.y}px`,
+            '--token-color': token.color,
+          }"
+          :title="token.name"
+        >
+          {{ token.name.slice(0, 1).toUpperCase() }}
+        </div>
       </div>
     </div>
 

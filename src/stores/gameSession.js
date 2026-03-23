@@ -84,6 +84,46 @@ const getErrorMessage = (error) => {
   )
 }
 
+const normalizeMoveMeta = (moveMeta) => {
+  if (!moveMeta || typeof moveMeta !== 'object') {
+    return null
+  }
+
+  return {
+    previousPosition:
+      moveMeta.previous_position ?? moveMeta.previous_pos ?? moveMeta.previousPosition ?? null,
+    newPosition: moveMeta.new_position ?? moveMeta.new_pos ?? moveMeta.newPosition ?? null,
+    action: moveMeta.action_required ?? moveMeta.action ?? moveMeta.actionType ?? null,
+    moneyChange: moveMeta.money_change ?? moveMeta.moneyChange ?? null,
+    tileLandedOn: moveMeta.tile_landed_on ?? moveMeta.tileLandedOn ?? null,
+    playerId: moveMeta.player_id ?? moveMeta.playerId ?? null,
+    playerName: moveMeta.player_name ?? moveMeta.playerName ?? null,
+    passedGo: Boolean(moveMeta.passed_go ?? moveMeta.passedGo),
+    raw: moveMeta,
+  }
+}
+
+const buildMoveSummary = (moveMeta, movementEvent) => {
+  if (!moveMeta && !movementEvent) {
+    return null
+  }
+
+  const actor = movementEvent?.playerName || moveMeta?.playerName || 'Current player'
+  const from = movementEvent?.from ?? moveMeta?.previousPosition
+  const to = movementEvent?.to ?? moveMeta?.newPosition
+  const tileName = moveMeta?.tileLandedOn?.name || moveMeta?.tileLandedOn || 'a tile'
+  const action = moveMeta?.action || 'resolved turn'
+  const money = moveMeta?.moneyChange
+  const moneyText = typeof money === 'number' && money !== 0 ? ` (${money > 0 ? '+' : ''}$${money})` : ''
+  const passGoText = moveMeta?.passedGo ? ' and passed GO' : ''
+
+  if (from != null && to != null) {
+    return `${actor} moved ${from} -> ${to}${passGoText}, ${action} at ${tileName}${moneyText}.`
+  }
+
+  return `${actor} ${action} at ${tileName}${moneyText}.`
+}
+
 export const useGameSessionStore = defineStore('gameSession', {
   state: () => ({
     gameId: null,
@@ -91,6 +131,7 @@ export const useGameSessionStore = defineStore('gameSession', {
     snapshot: null,
     lastMove: null,
     notifications: [],
+    movementEvent: null,
     isInitializing: false,
     isRolling: false,
     errorMessage: '',
@@ -99,6 +140,32 @@ export const useGameSessionStore = defineStore('gameSession', {
     boardTiles: (state) => state.snapshot?.board || [],
     players: (state) => state.snapshot?.players || [],
     currentTurn: (state) => state.snapshot?.current_turn ?? 0,
+    turnNumber: (state) =>
+      state.snapshot?.turn_number ?? state.snapshot?.turnNumber ?? (state.snapshot?.current_turn ?? 0) + 1,
+    currentPlayerId: (state) =>
+      state.snapshot?.current_player_id ?? state.snapshot?.currentPlayerId ?? state.snapshot?.current_player?.id,
+    currentPlayerName: (state) => {
+      const explicitName = state.snapshot?.current_player?.name ?? state.snapshot?.currentPlayer?.name
+      if (explicitName) {
+        return explicitName
+      }
+
+      const players = state.snapshot?.players || []
+      if (!players.length) {
+        return 'N/A'
+      }
+
+      const explicitId = state.snapshot?.current_player_id ?? state.snapshot?.currentPlayerId
+      if (explicitId != null) {
+        const matched = players.find((player) => String(player.id) === String(explicitId))
+        if (matched) {
+          return matched.name
+        }
+      }
+
+      const idx = (state.snapshot?.current_turn ?? 0) % players.length
+      return players[idx]?.name || 'N/A'
+    },
     winner: (state) => state.snapshot?.winner || null,
     isGameOver: (state) => Boolean(state.snapshot?.winner) || state.snapshot?.status === 'finished',
     canRoll: (state) => Boolean(state.gameId) && !state.isRolling && !state.isInitializing,
@@ -124,6 +191,7 @@ export const useGameSessionStore = defineStore('gameSession', {
         snapshot: this.snapshot,
         lastMove: this.lastMove,
         notifications: this.notifications,
+        movementEvent: this.movementEvent,
       }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState))
@@ -143,9 +211,49 @@ export const useGameSessionStore = defineStore('gameSession', {
       this.persist()
     },
     overwriteSnapshot(snapshot, moveMeta = null) {
+      const previousSnapshot = this.snapshot
       this.snapshot = normalizeSnapshot(snapshot, this.gameId, this.config)
       this.gameId = this.snapshot.id || this.snapshot.game_id || this.gameId
-      this.lastMove = moveMeta
+      const normalizedMove = normalizeMoveMeta(moveMeta)
+      this.lastMove = normalizedMove
+
+      let movementEvent = null
+      if (normalizedMove && this.snapshot?.players?.length) {
+        const nextPlayers = this.snapshot.players
+        const previousPlayers = previousSnapshot?.players || []
+
+        const previousById = new Map(previousPlayers.map((player) => [String(player.id), player]))
+
+        let movedPlayer = null
+        if (normalizedMove.playerId != null) {
+          movedPlayer = nextPlayers.find((player) => String(player.id) === String(normalizedMove.playerId)) || null
+        }
+        if (!movedPlayer && normalizedMove.playerName) {
+          movedPlayer = nextPlayers.find((player) => player.name === normalizedMove.playerName) || null
+        }
+        if (!movedPlayer) {
+          movedPlayer =
+            nextPlayers.find((player) => {
+              const prior = previousById.get(String(player.id))
+              return prior && Number(prior.position) !== Number(player.position)
+            }) || null
+        }
+
+        if (movedPlayer) {
+          const priorPlayer = previousById.get(String(movedPlayer.id))
+          movementEvent = {
+            playerId: movedPlayer.id,
+            playerName: movedPlayer.name,
+            from:
+              normalizedMove.previousPosition ??
+              (priorPlayer ? Number(priorPlayer.position) : Number(movedPlayer.position)),
+            to: normalizedMove.newPosition ?? Number(movedPlayer.position),
+            at: Date.now(),
+          }
+        }
+      }
+
+      this.movementEvent = movementEvent
       this.persist()
     },
     startLocalSession(config) {
@@ -219,7 +327,9 @@ export const useGameSessionStore = defineStore('gameSession', {
 
         const moveMeta = extractMoveMeta(payload)
         this.overwriteSnapshot(updatedSnapshot, moveMeta)
-        this.addNotification('Turn resolved and snapshot replaced.', 'success')
+
+        const summary = buildMoveSummary(this.lastMove, this.movementEvent)
+        this.addNotification(summary || 'Turn resolved and snapshot replaced.', 'success')
       } catch (error) {
         this.errorMessage = getErrorMessage(error)
         this.addNotification(this.errorMessage, 'danger')

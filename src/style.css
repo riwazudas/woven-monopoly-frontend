@@ -229,6 +229,7 @@ code {
   margin-top: 0;
   gap: 0.45rem;
   aspect-ratio: 1 / 1;
+  position: relative;
 }
 
 .board-tile {
@@ -318,6 +319,49 @@ code {
   color: var(--ink-muted);
 }
 
+.player-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.player-token {
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--token-color, var(--accent));
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  display: grid;
+  place-items: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  transform: translate(calc(var(--token-x) - 50%), calc(var(--token-y) - 50%));
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.player-layer-ready .player-token {
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.player-token-instant {
+  transition: none !important;
+}
+
+.player-token-moving {
+  animation: pulse-token 0.55s ease-out;
+}
+
+@keyframes pulse-token {
+  0% {
+    box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(15, 118, 110, 0);
+  }
+}
+
 .tile-inspector {
   display: grid;
   gap: 0.35rem;
@@ -362,6 +406,10 @@ code {
 .dice-roller {
   display: grid;
   gap: 0.55rem;
+}
+
+.dice-roller .lead {
+  font-size: 0.82rem;
 }
 
 .notifications ul {
