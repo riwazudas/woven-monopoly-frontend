@@ -394,14 +394,20 @@ const boardCenterStyle = computed(() => {
       </div>
     </div>
 
-    <article v-if="activeTile" class="status-card tile-inspector">
-      <h2>Tile Details</h2>
-      <p><strong>Name:</strong> {{ activeTile.name }}</p>
-      <p><strong>Type:</strong> {{ activeTile.type }}</p>
-      <p><strong>Price:</strong> {{ activeTile.price != null ? `$${activeTile.price}` : 'N/A' }}</p>
-      <p><strong>Rent:</strong> {{ inspectorRent }}</p>
-      <p><strong>Owner:</strong> {{ activeTile.owner?.name || 'Bank' }}</p>
-      <p><strong>Colour:</strong> {{ activeTile.colour || 'None' }}</p>
-    </article>
+    <div class="board-right-stack">
+      <slot name="right-top" />
+
+      <article v-if="activeTile" class="status-card tile-inspector">
+        <h2>Tile Details</h2>
+        <p><strong>Name:</strong> {{ activeTile.name }}</p>
+        <p><strong>Type:</strong> {{ activeTile.type }}</p>
+        <p><strong>Price:</strong> {{ activeTile.price != null ? `$${activeTile.price}` : 'N/A' }}</p>
+        <p><strong>Rent:</strong> {{ inspectorRent }}</p>
+        <p><strong>Owner:</strong> {{ activeTile.owner?.name || 'Bank' }}</p>
+        <p><strong>Colour:</strong> {{ activeTile.colour || 'None' }}</p>
+      </article>
+
+      <slot name="right-panels" />
+    </div>
   </section>
 </template>
