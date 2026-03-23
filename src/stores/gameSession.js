@@ -84,6 +84,45 @@ const getErrorMessage = (error) => {
   )
 }
 
+const classifyApiError = (error, context = 'unknown') => {
+  const status = error?.response?.status
+  const message = String(getErrorMessage(error) || '').toLowerCase()
+
+  if (status === 404) {
+    return {
+      type: 'game-not-found',
+      context,
+      status,
+      message: getErrorMessage(error),
+    }
+  }
+
+  if (context === 'roll' && (status === 409 || message.includes('inactive') || message.includes('finished'))) {
+    return {
+      type: 'game-inactive',
+      context,
+      status,
+      message: getErrorMessage(error),
+    }
+  }
+
+  if (context === 'roll' && (status === 400 || status === 422 || message.includes('invalid move'))) {
+    return {
+      type: 'invalid-move',
+      context,
+      status,
+      message: getErrorMessage(error),
+    }
+  }
+
+  return {
+    type: 'unknown',
+    context,
+    status,
+    message: getErrorMessage(error),
+  }
+}
+
 const normalizeMoveMeta = (moveMeta) => {
   if (!moveMeta || typeof moveMeta !== 'object') {
     return null
@@ -132,6 +171,7 @@ export const useGameSessionStore = defineStore('gameSession', {
     lastMove: null,
     notifications: [],
     movementEvent: null,
+    lastApiError: null,
     isInitializing: false,
     isRolling: false,
     errorMessage: '',
@@ -192,6 +232,7 @@ export const useGameSessionStore = defineStore('gameSession', {
         lastMove: this.lastMove,
         notifications: this.notifications,
         movementEvent: this.movementEvent,
+        lastApiError: this.lastApiError,
       }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedState))
@@ -281,6 +322,7 @@ export const useGameSessionStore = defineStore('gameSession', {
     async createGameSession(config) {
       this.isInitializing = true
       this.errorMessage = ''
+      this.lastApiError = null
       this.config = {
         ...defaultConfig,
         ...config,
@@ -297,9 +339,13 @@ export const useGameSessionStore = defineStore('gameSession', {
         this.gameId = snapshot.id || snapshot.game_id || this.gameId
         this.overwriteSnapshot(snapshot, extractMoveMeta(payload))
         this.addNotification('Game initialized from backend.', 'success')
+        return { ok: true, source: 'backend' }
       } catch (error) {
-        this.errorMessage = getErrorMessage(error)
-        this.startLocalSession(config)
+        const apiError = classifyApiError(error, 'create')
+        this.lastApiError = apiError
+        this.errorMessage = apiError.message
+        this.addNotification(this.errorMessage, 'danger')
+        return { ok: false, source: 'backend', error: this.errorMessage }
       } finally {
         this.isInitializing = false
       }
@@ -316,6 +362,7 @@ export const useGameSessionStore = defineStore('gameSession', {
 
       this.isRolling = true
       this.errorMessage = ''
+      this.lastApiError = null
 
       try {
         const payload = await gameApi.rollGame(this.gameId)
@@ -331,8 +378,17 @@ export const useGameSessionStore = defineStore('gameSession', {
         const summary = buildMoveSummary(this.lastMove, this.movementEvent)
         this.addNotification(summary || 'Turn resolved and snapshot replaced.', 'success')
       } catch (error) {
-        this.errorMessage = getErrorMessage(error)
-        this.addNotification(this.errorMessage, 'danger')
+        const apiError = classifyApiError(error, 'roll')
+        this.lastApiError = apiError
+        this.errorMessage = apiError.message
+
+        if (apiError.type === 'game-inactive') {
+          this.addNotification('Game is inactive. No more moves can be rolled.', 'warning')
+        } else if (apiError.type === 'invalid-move') {
+          this.addNotification('Invalid move received from backend. Please try again.', 'warning')
+        } else {
+          this.addNotification(this.errorMessage, 'danger')
+        }
       } finally {
         this.isRolling = false
       }

@@ -26,17 +26,54 @@ const parseDice = (value) => {
     .filter((value) => Number.isInteger(value) && value > 0)
 }
 
-const beginGame = async () => {
-  const config = {
-    playerNames: [form.playerOne, form.playerTwo, form.playerThree, form.playerFour],
-    goMoney: Number(form.goMoney),
-    rentMultiplier: Number(form.rentMultiplier),
-    diceSequence: parseDice(form.diceSequence),
+const trimmedNames = computed(() => {
+  return [form.playerOne, form.playerTwo, form.playerThree, form.playerFour].map((name) => name.trim())
+})
+
+const parsedDiceSequence = computed(() => parseDice(form.diceSequence))
+
+const setupValidationError = computed(() => {
+  if (trimmedNames.value.some((name) => !name)) {
+    return 'All four player names are required.'
   }
 
-  await sessionStore.createGameSession(config)
+  if (new Set(trimmedNames.value.map((name) => name.toLowerCase())).size !== 4) {
+    return 'Player names must be unique.'
+  }
 
-  router.push({ name: 'board' })
+  if (!Number.isInteger(Number(form.goMoney)) || Number(form.goMoney) < 1) {
+    return 'GO money must be a positive whole number.'
+  }
+
+  if (!Number.isInteger(Number(form.rentMultiplier)) || Number(form.rentMultiplier) < 1) {
+    return 'Rent multiplier must be a positive whole number.'
+  }
+
+  if (parsedDiceSequence.value.length === 0) {
+    return 'Provide at least one valid dice value (comma-separated positive integers).'
+  }
+
+  return ''
+})
+
+const canSubmit = computed(() => !isSubmitting.value && !setupValidationError.value)
+
+const beginGame = async () => {
+  if (setupValidationError.value) {
+    return
+  }
+
+  const config = {
+    playerNames: trimmedNames.value,
+    goMoney: Number(form.goMoney),
+    rentMultiplier: Number(form.rentMultiplier),
+    diceSequence: parsedDiceSequence.value,
+  }
+
+  const result = await sessionStore.createGameSession(config)
+  if (result?.ok) {
+    router.push({ name: 'board' })
+  }
 }
 </script>
 
@@ -45,6 +82,10 @@ const beginGame = async () => {
     <div class="panel">
       <h1>Game Setup</h1>
       <p class="lead">Configure players and simulation settings before initializing the game.</p>
+      <p class="setup-hint">
+        Submitting setup sends a backend request to create a game and returns the full initial snapshot.
+      </p>
+      <p v-if="setupValidationError" class="error-text">{{ setupValidationError }}</p>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
       <form class="setup-form" @submit.prevent="beginGame">
@@ -85,11 +126,19 @@ const beginGame = async () => {
 
         <div class="actions span-2">
           <RouterLink class="btn ghost" :to="{ name: 'landing' }">Back</RouterLink>
-          <button class="btn primary" type="submit" :disabled="isSubmitting">
+          <button class="btn primary" type="submit" :disabled="!canSubmit">
             {{ isSubmitting ? 'Starting...' : 'Initialize Game' }}
           </button>
         </div>
       </form>
+
+      <aside class="setup-preview">
+        <h2>Preview</h2>
+        <p><strong>Players:</strong> {{ trimmedNames.join(', ') }}</p>
+        <p><strong>GO Money:</strong> ${{ Number(form.goMoney) }}</p>
+        <p><strong>Rent Multiplier:</strong> x{{ Number(form.rentMultiplier) }}</p>
+        <p><strong>Dice Sequence:</strong> {{ parsedDiceSequence.join(', ') || 'None' }}</p>
+      </aside>
     </div>
   </section>
 </template>

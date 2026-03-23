@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BoardGrid from '../components/BoardGrid.vue'
 import DiceRoller from '../components/DiceRoller.vue'
@@ -13,6 +13,17 @@ const gameId = computed(() => sessionStore.gameId)
 const config = computed(() => sessionStore.config)
 const players = computed(() => sessionStore.players)
 const winner = computed(() => sessionStore.winner)
+const lastApiError = computed(() => sessionStore.lastApiError)
+
+watch(
+  () => lastApiError.value,
+  (apiError) => {
+    if (apiError?.type === 'game-not-found') {
+      sessionStore.resetSession()
+      router.push({ name: 'landing' })
+    }
+  },
+)
 
 const finishDemoGame = () => {
   if (!sessionStore.snapshot) {

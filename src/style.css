@@ -208,6 +208,26 @@ code {
   font-weight: 700;
 }
 
+.setup-hint {
+  margin-top: 0.6rem;
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+}
+
+.setup-preview {
+  margin-top: 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.setup-preview p {
+  margin: 0;
+}
+
 .span-2 {
   grid-column: span 2;
 }
