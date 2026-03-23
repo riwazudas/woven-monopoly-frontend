@@ -11,6 +11,7 @@ const gridRef = ref(null)
 const isLayerReady = ref(false)
 const tileNodeByPosition = ref({})
 const tokenCoordinates = ref({})
+const moneyBubbles = ref([])
 
 const ownerPalette = ['#0f766e', '#b45309', '#0369a1', '#a21caf']
 
@@ -116,6 +117,12 @@ const activeTile = computed(() => {
   return tilePlacements.value.find((tile) => String(tile.id) === String(activeTileId.value)) || tilePlacements.value[0]
 })
 
+const lastMove = computed(() => sessionStore.lastMove)
+
+const landedPosition = computed(() => {
+  return sessionStore.movementEvent?.to ?? lastMove.value?.newPosition ?? null
+})
+
 const inspectorRent = computed(() => {
   if (!activeTile.value) {
     return 'N/A'
@@ -147,6 +154,48 @@ const setTileNode = (position, node) => {
   } else {
     delete tileNodeByPosition.value[key]
   }
+}
+
+const tileCenter = (position) => {
+  if (!gridRef.value) {
+    return null
+  }
+
+  const node = tileNodeByPosition.value[String(position)]
+  if (!node) {
+    return null
+  }
+
+  const gridRect = gridRef.value.getBoundingClientRect()
+  const rect = node.getBoundingClientRect()
+  return {
+    x: rect.left - gridRect.left + rect.width / 2,
+    y: rect.top - gridRect.top + rect.height / 2,
+  }
+}
+
+const spawnMoneyBubble = async (amount, position) => {
+  if (typeof amount !== 'number' || amount === 0 || position == null) {
+    return
+  }
+
+  await nextTick()
+  const center = tileCenter(position)
+  if (!center) {
+    return
+  }
+
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+  moneyBubbles.value.push({
+    id,
+    x: center.x,
+    y: center.y,
+    amount,
+  })
+
+  window.setTimeout(() => {
+    moneyBubbles.value = moneyBubbles.value.filter((item) => item.id !== id)
+  }, 1350)
 }
 
 const playerTokenColor = (name = '') => {
@@ -233,6 +282,18 @@ watch(
 )
 
 watch(
+  () => lastMove.value,
+  async (move) => {
+    if (!move) {
+      return
+    }
+
+    const targetPosition = move.newPosition ?? sessionStore.movementEvent?.to
+    await spawnMoneyBubble(move.moneyChange, targetPosition)
+  },
+)
+
+watch(
   () => tilePlacements.value.length,
   async () => {
     await syncTokenCoordinates(true)
@@ -264,7 +325,11 @@ const boardCenterStyle = computed(() => {
         :key="tile.id"
         :ref="(node) => setTileNode(tile.position, node)"
         class="board-tile"
-        :class="{ 'board-tile-owned': Boolean(tile.owner), 'board-tile-active': activeTile?.id === tile.id }"
+        :class="{
+          'board-tile-owned': Boolean(tile.owner),
+          'board-tile-active': activeTile?.id === tile.id,
+          'board-tile-landed': landedPosition != null && Number(tile.position) === Number(landedPosition),
+        }"
         :style="{
           gridColumn: tile.column,
           gridRow: tile.row,
@@ -311,6 +376,21 @@ const boardCenterStyle = computed(() => {
         >
           {{ token.name.slice(0, 1).toUpperCase() }}
         </div>
+      </div>
+
+      <div class="money-bubble-layer" aria-hidden="true">
+        <span
+          v-for="bubble in moneyBubbles"
+          :key="bubble.id"
+          class="money-bubble"
+          :class="{ 'money-bubble-negative': bubble.amount < 0, 'money-bubble-positive': bubble.amount > 0 }"
+          :style="{
+            '--bubble-x': `${bubble.x}px`,
+            '--bubble-y': `${bubble.y}px`,
+          }"
+        >
+          {{ bubble.amount > 0 ? '+' : '' }}${{ bubble.amount }}
+        </span>
       </div>
     </div>
 

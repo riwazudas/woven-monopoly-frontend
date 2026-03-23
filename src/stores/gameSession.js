@@ -132,6 +132,13 @@ const normalizeMoveMeta = (moveMeta) => {
     previousPosition:
       moveMeta.previous_position ?? moveMeta.previous_pos ?? moveMeta.previousPosition ?? null,
     newPosition: moveMeta.new_position ?? moveMeta.new_pos ?? moveMeta.newPosition ?? null,
+    diceRoll:
+      moveMeta.dice_roll ??
+      moveMeta.diceRoll ??
+      moveMeta.roll_value ??
+      moveMeta.rollValue ??
+      moveMeta.roll ??
+      null,
     action: moveMeta.action_required ?? moveMeta.action ?? moveMeta.actionType ?? null,
     moneyChange: moveMeta.money_change ?? moveMeta.moneyChange ?? null,
     tileLandedOn: moveMeta.tile_landed_on ?? moveMeta.tileLandedOn ?? null,
@@ -140,6 +147,30 @@ const normalizeMoveMeta = (moveMeta) => {
     passedGo: Boolean(moveMeta.passed_go ?? moveMeta.passedGo),
     raw: moveMeta,
   }
+}
+
+const formatActionText = (action) => {
+  const normalized = String(action || '')
+    .trim()
+    .toLowerCase()
+
+  if (!normalized) {
+    return 'resolved the turn'
+  }
+
+  if (normalized.includes('buy')) {
+    return 'bought property'
+  }
+
+  if (normalized.includes('rent') || normalized.includes('pay')) {
+    return 'paid rent'
+  }
+
+  if (normalized.includes('none') || normalized.includes('no_action') || normalized.includes('no action')) {
+    return 'took no action'
+  }
+
+  return normalized.replace(/_/g, ' ')
 }
 
 const buildMoveSummary = (moveMeta, movementEvent) => {
@@ -151,7 +182,7 @@ const buildMoveSummary = (moveMeta, movementEvent) => {
   const from = movementEvent?.from ?? moveMeta?.previousPosition
   const to = movementEvent?.to ?? moveMeta?.newPosition
   const tileName = moveMeta?.tileLandedOn?.name || moveMeta?.tileLandedOn || 'a tile'
-  const action = moveMeta?.action || 'resolved turn'
+  const action = formatActionText(moveMeta?.action)
   const money = moveMeta?.moneyChange
   const moneyText = typeof money === 'number' && money !== 0 ? ` (${money > 0 ? '+' : ''}$${money})` : ''
   const passGoText = moveMeta?.passedGo ? ' and passed GO' : ''
@@ -259,17 +290,17 @@ export const useGameSessionStore = defineStore('gameSession', {
       this.lastMove = normalizedMove
 
       let movementEvent = null
-      if (normalizedMove && this.snapshot?.players?.length) {
+      if (this.snapshot?.players?.length) {
         const nextPlayers = this.snapshot.players
         const previousPlayers = previousSnapshot?.players || []
 
         const previousById = new Map(previousPlayers.map((player) => [String(player.id), player]))
 
         let movedPlayer = null
-        if (normalizedMove.playerId != null) {
+        if (normalizedMove?.playerId != null) {
           movedPlayer = nextPlayers.find((player) => String(player.id) === String(normalizedMove.playerId)) || null
         }
-        if (!movedPlayer && normalizedMove.playerName) {
+        if (!movedPlayer && normalizedMove?.playerName) {
           movedPlayer = nextPlayers.find((player) => player.name === normalizedMove.playerName) || null
         }
         if (!movedPlayer) {
@@ -286,10 +317,25 @@ export const useGameSessionStore = defineStore('gameSession', {
             playerId: movedPlayer.id,
             playerName: movedPlayer.name,
             from:
-              normalizedMove.previousPosition ??
+              normalizedMove?.previousPosition ??
               (priorPlayer ? Number(priorPlayer.position) : Number(movedPlayer.position)),
-            to: normalizedMove.newPosition ?? Number(movedPlayer.position),
+            to: normalizedMove?.newPosition ?? Number(movedPlayer.position),
             at: Date.now(),
+          }
+
+          if (!this.lastMove) {
+            this.lastMove = {
+              previousPosition: movementEvent.from,
+              newPosition: movementEvent.to,
+              action: null,
+              moneyChange: null,
+              tileLandedOn: null,
+              playerId: movementEvent.playerId,
+              playerName: movementEvent.playerName,
+              passedGo: movementEvent.to < movementEvent.from,
+              diceRoll: null,
+              raw: null,
+            }
           }
         }
       }

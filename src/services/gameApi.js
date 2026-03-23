@@ -39,5 +39,26 @@ export const extractMoveMeta = (payload) => {
     return null
   }
 
-  return payload.move_result || payload.moveMeta || payload.move_result_data || null
+  const baseMove = payload.move_result || payload.moveMeta || payload.move_result_data || null
+  if (!baseMove) {
+    return null
+  }
+
+  const diceRoll =
+    payload.dice_roll ??
+    payload.diceRoll ??
+    payload.roll ??
+    payload.roll_value ??
+    payload.rollValue ??
+    baseMove.dice_roll ??
+    baseMove.diceRoll ??
+    baseMove.roll ??
+    baseMove.roll_value ??
+    baseMove.rollValue ??
+    null
+
+  return {
+    ...baseMove,
+    dice_roll: diceRoll,
+  }
 }

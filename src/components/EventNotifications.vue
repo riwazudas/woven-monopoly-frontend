@@ -7,6 +7,27 @@ const sessionStore = useGameSessionStore()
 const notifications = computed(() => sessionStore.notifications)
 const lastMove = computed(() => sessionStore.lastMove)
 
+const formatActionText = (action) => {
+  const normalized = String(action || '')
+    .trim()
+    .toLowerCase()
+
+  if (!normalized) {
+    return 'resolved the turn'
+  }
+  if (normalized.includes('buy')) {
+    return 'bought property'
+  }
+  if (normalized.includes('rent') || normalized.includes('pay')) {
+    return 'paid rent'
+  }
+  if (normalized.includes('none') || normalized.includes('no_action') || normalized.includes('no action')) {
+    return 'no action'
+  }
+
+  return normalized.replace(/_/g, ' ')
+}
+
 const moveSummary = computed(() => {
   const move = lastMove.value
   if (!move) {
@@ -15,16 +36,17 @@ const moveSummary = computed(() => {
 
   const from = move.previousPosition
   const to = move.newPosition
-  const action = move.action || 'resolved turn'
+  const action = formatActionText(move.action)
   const tileName = move.tileLandedOn?.name || move.tileLandedOn || 'a tile'
   const money = move.moneyChange
   const moneyText = typeof money === 'number' && money !== 0 ? ` (${money > 0 ? '+' : ''}$${money})` : ''
+  const actor = move.playerName || 'Current player'
 
   if (from != null && to != null) {
-    return `Moved ${from} -> ${to}, ${action} on ${tileName}${moneyText}`
+    return `${actor} moved ${from} -> ${to}, ${action} on ${tileName}${moneyText}`
   }
 
-  return `${action} on ${tileName}${moneyText}`
+  return `${actor} ${action} on ${tileName}${moneyText}`
 })
 
 const dismiss = (id) => {
