@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameSessionStore } from '../stores/gameSession'
 
@@ -16,21 +16,46 @@ const form = reactive({
   playerFour: 'Sweedal',
   goMoney: 1,
   rentMultiplier: 1,
-  diceSequence: '1,3,1,1,1,2',
+  rollFile: 'rolls_1.json',
 })
 
-const parseDice = (value) => {
-  return value
-    .split(',')
-    .map((entry) => Number.parseInt(entry.trim(), 10))
-    .filter((value) => Number.isInteger(value) && value > 0)
-}
+const isLoadingRollFiles = ref(false)
+const rollFilesLoadError = ref('')
 
 const trimmedNames = computed(() => {
   return [form.playerOne, form.playerTwo, form.playerThree, form.playerFour].map((name) => name.trim())
 })
 
-const parsedDiceSequence = computed(() => parseDice(form.diceSequence))
+const rollFileOptions = computed(() => {
+  const fromStore = Array.isArray(sessionStore.availableRollFiles) ? sessionStore.availableRollFiles : []
+
+  if (fromStore.length > 0) {
+    return fromStore
+  }
+
+  return ['rolls_1.json', 'rolls_2.json']
+})
+
+const loadRollFiles = async () => {
+  isLoadingRollFiles.value = true
+  rollFilesLoadError.value = ''
+
+  const result = await sessionStore.fetchRollFiles()
+  if (!result?.ok) {
+    rollFilesLoadError.value = result?.error || 'Failed to load roll files from backend.'
+  }
+
+  const options = rollFileOptions.value
+  if (!options.includes(form.rollFile)) {
+    form.rollFile = options[0] || ''
+  }
+
+  isLoadingRollFiles.value = false
+}
+
+onMounted(() => {
+  loadRollFiles()
+})
 
 const setupValidationError = computed(() => {
   if (trimmedNames.value.some((name) => !name)) {
@@ -49,14 +74,18 @@ const setupValidationError = computed(() => {
     return 'Rent multiplier must be a positive whole number.'
   }
 
-  if (parsedDiceSequence.value.length === 0) {
-    return 'Provide at least one valid dice value (comma-separated positive integers).'
+  if (!form.rollFile) {
+    return 'Please select a roll file.'
+  }
+
+  if (rollFileOptions.value.length > 0 && !rollFileOptions.value.includes(form.rollFile)) {
+    return 'Selected roll file is not available.'
   }
 
   return ''
 })
 
-const canSubmit = computed(() => !isSubmitting.value && !setupValidationError.value)
+const canSubmit = computed(() => !isSubmitting.value && !isLoadingRollFiles.value && !setupValidationError.value)
 
 const beginGame = async () => {
   if (setupValidationError.value) {
@@ -67,7 +96,7 @@ const beginGame = async () => {
     playerNames: trimmedNames.value,
     goMoney: Number(form.goMoney),
     rentMultiplier: Number(form.rentMultiplier),
-    diceSequence: parsedDiceSequence.value,
+    rollFile: form.rollFile,
   }
 
   const result = await sessionStore.createGameSession(config)
@@ -85,6 +114,7 @@ const beginGame = async () => {
       <p class="setup-hint">
         Submitting setup sends a backend request to create a game and returns the full initial snapshot.
       </p>
+      <p v-if="rollFilesLoadError" class="error-text">{{ rollFilesLoadError }}</p>
       <p v-if="setupValidationError" class="error-text">{{ setupValidationError }}</p>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
 
@@ -120,8 +150,12 @@ const beginGame = async () => {
           />
         </label>
         <label class="span-2">
-          Dice Sequence
-          <input v-model="form.diceSequence" type="text" placeholder="1,2,3,4" required />
+          Roll File
+          <select v-model="form.rollFile" :disabled="isLoadingRollFiles" required>
+            <option v-for="rollFile in rollFileOptions" :key="rollFile" :value="rollFile">
+              {{ rollFile }}
+            </option>
+          </select>
         </label>
 
         <div class="actions span-2">
@@ -137,7 +171,7 @@ const beginGame = async () => {
         <p><strong>Players:</strong> {{ trimmedNames.join(', ') }}</p>
         <p><strong>GO Money:</strong> ${{ Number(form.goMoney) }}</p>
         <p><strong>Rent Multiplier:</strong> x{{ Number(form.rentMultiplier) }}</p>
-        <p><strong>Dice Sequence:</strong> {{ parsedDiceSequence.join(', ') || 'None' }}</p>
+        <p><strong>Roll File:</strong> {{ form.rollFile || 'None' }}</p>
       </aside>
     </div>
   </section>

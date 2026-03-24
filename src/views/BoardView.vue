@@ -80,7 +80,7 @@ const finishDemoGame = () => {
                   <h2>Current Config</h2>
                   <p>GO Money: ${{ config.goMoney }}</p>
                   <p>Rent Multiplier: x{{ config.rentMultiplier }}</p>
-                  <p>Dice Sequence: {{ config.diceSequence.join(', ') }}</p>
+                  <p>Roll File: {{ config.rollFile || 'N/A' }}</p>
                 </article>
               </div>
             </template>

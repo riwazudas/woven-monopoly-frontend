@@ -9,7 +9,7 @@ const defaultConfig = {
   playerNames: ['Peter', 'Billy', 'Charlotte', 'Sweedal'],
   goMoney: 1,
   rentMultiplier: 1,
-  diceSequence: [1, 3, 1, 1, 1, 2],
+  rollFile: 'rolls_1.json',
 }
 
 const makeFallbackBoard = () => {
@@ -69,7 +69,8 @@ const normalizeSnapshot = (snapshot, gameId, config) => {
     config: {
       go_money: incoming.config?.go_money ?? config.goMoney,
       rent_multiplier: incoming.config?.rent_multiplier ?? config.rentMultiplier,
-      dice_sequence: incoming.config?.dice_sequence ?? config.diceSequence,
+      roll_file: incoming.config?.roll_file ?? config.rollFile,
+      dice_sequence: incoming.config?.dice_sequence ?? incoming.config?.diceSequence ?? null,
       player_names: incoming.config?.player_names ?? config.playerNames,
     },
   }
@@ -198,6 +199,7 @@ export const useGameSessionStore = defineStore('gameSession', {
   state: () => ({
     gameId: null,
     config: { ...defaultConfig },
+    availableRollFiles: [],
     snapshot: null,
     lastMove: null,
     notifications: [],
@@ -259,6 +261,7 @@ export const useGameSessionStore = defineStore('gameSession', {
       const persistedState = {
         gameId: this.gameId,
         config: this.config,
+        availableRollFiles: this.availableRollFiles,
         snapshot: this.snapshot,
         lastMove: this.lastMove,
         notifications: this.notifications,
@@ -364,6 +367,28 @@ export const useGameSessionStore = defineStore('gameSession', {
       )
 
       this.addNotification('Started a local preview session. Connect backend for live rolls.', 'warning')
+    },
+    async fetchRollFiles() {
+      try {
+        const payload = await gameApi.listRollFiles()
+        const rollFiles = payload?.roll_files ?? payload?.rollFiles ?? []
+
+        if (!Array.isArray(rollFiles)) {
+          this.availableRollFiles = []
+          return { ok: false, rollFiles: [], error: 'Roll files response is invalid.' }
+        }
+
+        this.availableRollFiles = rollFiles
+          .filter((item) => typeof item === 'string')
+          .map((item) => item.trim())
+          .filter(Boolean)
+
+        this.persist()
+        return { ok: true, rollFiles: this.availableRollFiles }
+      } catch (error) {
+        const message = getErrorMessage(error)
+        return { ok: false, rollFiles: [], error: message }
+      }
     },
     async createGameSession(config) {
       this.isInitializing = true

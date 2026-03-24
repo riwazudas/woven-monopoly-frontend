@@ -7,16 +7,21 @@ const apiClient = axios.create({
 const unwrapData = (response) => response?.data || {}
 
 export const gameApi = {
-  async createGame({ playerNames, goMoney, rentMultiplier, diceSequence }) {
+  async createGame({ playerNames, goMoney, rentMultiplier, rollFile }) {
     const response = await apiClient.post('/games', {
       player_names: playerNames,
       config: {
         go_money: goMoney,
         rent_multiplier: rentMultiplier,
-        dice_sequence: diceSequence,
+        roll_file: rollFile,
       },
     })
 
+    return unwrapData(response)
+  },
+
+  async listRollFiles() {
+    const response = await apiClient.get('/roll_files')
     return unwrapData(response)
   },
 

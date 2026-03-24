@@ -195,7 +195,8 @@ code {
   font-weight: 500;
 }
 
-.setup-form input {
+.setup-form input,
+.setup-form select {
   border: 1px solid var(--line);
   border-radius: 0.6rem;
   padding: 0.58rem 0.65rem;
