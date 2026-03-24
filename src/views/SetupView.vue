@@ -114,6 +114,9 @@ const beginGame = async () => {
       <p class="setup-hint">
         Submitting setup sends a backend request to create a game and returns the full initial snapshot.
       </p>
+      <p v-if="isSubmitting" class="setup-hint">
+        Backend may be waking up. Please wait a few seconds while the game initializes.
+      </p>
       <p v-if="rollFilesLoadError" class="error-text">{{ rollFilesLoadError }}</p>
       <p v-if="setupValidationError" class="error-text">{{ setupValidationError }}</p>
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
@@ -161,7 +164,7 @@ const beginGame = async () => {
         <div class="actions span-2">
           <RouterLink class="btn ghost" :to="{ name: 'landing' }">Back</RouterLink>
           <button class="btn primary" type="submit" :disabled="!canSubmit">
-            {{ isSubmitting ? 'Starting...' : 'Initialize Game' }}
+            {{ isSubmitting ? 'Initializing...' : 'Initialize Game' }}
           </button>
         </div>
       </form>
